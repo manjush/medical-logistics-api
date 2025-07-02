@@ -69,7 +69,7 @@ Key files:
 - **Docker** - Containerization for consistent deployments
 - **JUnit 5** - Comprehensive testing framework
 - **Lombok** - Reduces boilerplate code (used in DTOs and services)
-- **SLF4J + Logback** - Structured logging
+- **SLF4J** -  logging
 
 
 ### Prerequisites
