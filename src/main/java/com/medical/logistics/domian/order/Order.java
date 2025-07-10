@@ -49,7 +49,7 @@ public class Order {
     }
 
     public void approve() {
-        if (!canTransitionTo(OrderStatus.APPROVED)) {
+        if (!canTransitionTo()) {
             throw new InvalidOrderStateException(
                     String.format("Cannot approve order in %s status", status)
             );
@@ -59,7 +59,7 @@ public class Order {
     }
 
     public void cancel() {
-        if (!canTransitionTo(OrderStatus.CANCELLED)) {
+        if (!canTransitionTo()) {
             throw new InvalidOrderStateException(
                     String.format("Cannot cancel order in %s status", status)
             );
@@ -69,7 +69,7 @@ public class Order {
         // emit OrderCancelledEvent
     }
 
-    private boolean canTransitionTo(OrderStatus targetStatus) {
+    private boolean canTransitionTo() {
         return status == OrderStatus.PENDING;
     }
 
