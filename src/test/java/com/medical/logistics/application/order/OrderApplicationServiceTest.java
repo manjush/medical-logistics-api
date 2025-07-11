@@ -3,6 +3,9 @@ package com.medical.logistics.application.order;
 import com.medical.logistics.application.order.commands.*;
 import com.medical.logistics.domian.order.*;
 import com.medical.logistics.domian.order.exceptions.OrderNotFoundException;
+import com.medical.logistics.interfaces.rest.OrderMapper;
+import com.medical.logistics.interfaces.rest.dto.OrderItemDto;
+import com.medical.logistics.interfaces.rest.dto.OrderResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -10,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,11 +27,14 @@ class OrderApplicationServiceTest {
     @Mock
     private OrderRepository orderRepository;
 
-    private OrderApplicationService orderService;
+    @Mock
+    private OrderMapper orderMapper;
+
+    private OrderApplicationServiceImpl orderService;
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderApplicationService(orderRepository);
+        orderService = new OrderApplicationServiceImpl(orderRepository, orderMapper);
     }
 
     @Test
@@ -39,14 +46,34 @@ class OrderApplicationServiceTest {
                 new PlaceOrderCommand.OrderItemCommand("Bandage", 20)
         ));
 
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Order savedOrder = Order.create(List.of(
+                new OrderItem("Syringe", 10),
+                new OrderItem("Bandage", 20)
+        ));
+
+        OrderResponse expectedResponse = OrderResponse.builder()
+                .id(savedOrder.getId().getValue())
+                .status("PENDING")
+                .items(List.of(
+                        new OrderItemDto("Syringe", 10),
+                        new OrderItemDto("Bandage", 20)
+                ))
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.save(any(Order.class))).thenReturn(savedOrder);
+        when(orderMapper.toResponse(savedOrder)).thenReturn(expectedResponse);
 
         // When
-        OrderId orderId = orderService.handle(command);
+        OrderResponse response = orderService.placeOrder(command);
 
         // Then
-        assertThat(orderId).isNotNull();
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo("PENDING");
+        assertThat(response.getItems()).hasSize(2);
         verify(orderRepository, times(1)).save(any(Order.class));
+        verify(orderMapper, times(1)).toResponse(savedOrder);
     }
 
     @Test
@@ -57,10 +84,10 @@ class OrderApplicationServiceTest {
         Order order = Order.create(List.of(new OrderItem("Mask", 100)));
 
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
 
         // When
-        orderService.handle(new ApproveOrderCommand(orderId));
+        orderService.approveOrder(new ApproveOrderCommand(orderId));
 
         // Then
         assertThat(order.getStatus()).isEqualTo(OrderStatus.APPROVED);
@@ -76,9 +103,12 @@ class OrderApplicationServiceTest {
         when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
 
         // When/Then
-        assertThatThrownBy(() -> orderService.handle(new ApproveOrderCommand(orderId)))
+        assertThatThrownBy(() -> orderService.approveOrder(new ApproveOrderCommand(orderId)))
                 .isInstanceOf(OrderNotFoundException.class)
                 .hasMessageContaining("Order not found with id");
+
+        verify(orderRepository, times(1)).findById(orderId);
+        verify(orderRepository, never()).save(any());
     }
 
     @Test
@@ -89,10 +119,10 @@ class OrderApplicationServiceTest {
         Order order = Order.create(List.of(new OrderItem("Thermometer", 5)));
 
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
 
         // When
-        orderService.handle(new CancelOrderCommand(orderId));
+        orderService.cancelOrder(new CancelOrderCommand(orderId));
 
         // Then
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
@@ -104,18 +134,36 @@ class OrderApplicationServiceTest {
     @DisplayName("Should get all orders")
     void shouldGetAllOrders() {
         // Given
-        List<Order> orders = List.of(
-                Order.create(List.of(new OrderItem("Item1", 10))),
-                Order.create(List.of(new OrderItem("Item2", 20)))
-        );
+        Order order1 = Order.create(List.of(new OrderItem("Item1", 10)));
+        Order order2 = Order.create(List.of(new OrderItem("Item2", 20)));
+
+        List<Order> orders = List.of(order1, order2);
+
+        OrderResponse response1 = OrderResponse.builder()
+                .id(order1.getId().getValue())
+                .status("PENDING")
+                .items(List.of(new OrderItemDto("Item1", 10)))
+                .build();
+
+        OrderResponse response2 = OrderResponse.builder()
+                .id(order2.getId().getValue())
+                .status("PENDING")
+                .items(List.of(new OrderItemDto("Item2", 20)))
+                .build();
+
         when(orderRepository.findAll()).thenReturn(orders);
+        when(orderMapper.toResponse(order1)).thenReturn(response1);
+        when(orderMapper.toResponse(order2)).thenReturn(response2);
 
         // When
-        List<Order> result = orderService.getAllOrders();
+        List<OrderResponse> result = orderService.getAllOrders();
 
         // Then
         assertThat(result).hasSize(2);
+        assertThat(result.get(0).getItems()).hasSize(1);
+        assertThat(result.get(1).getItems()).hasSize(1);
         verify(orderRepository, times(1)).findAll();
+        verify(orderMapper, times(2)).toResponse(any(Order.class));
     }
 
     @Test
@@ -124,13 +172,40 @@ class OrderApplicationServiceTest {
         // Given
         OrderId orderId = OrderId.generate();
         Order order = Order.create(List.of(new OrderItem("Gloves", 50)));
+
+        OrderResponse expectedResponse = OrderResponse.builder()
+                .id(orderId.getValue())
+                .status("PENDING")
+                .items(List.of(new OrderItemDto("Gloves", 50)))
+                .build();
+
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderMapper.toResponse(order)).thenReturn(expectedResponse);
 
         // When
-        Order result = orderService.getOrder(orderId);
+        OrderResponse result = orderService.getOrder(orderId);
 
         // Then
-        assertThat(result).isEqualTo(order);
+        assertThat(result).isNotNull();
+        assertThat(result.getId()).isEqualTo(orderId.getValue());
+        assertThat(result.getItems()).hasSize(1);
         verify(orderRepository, times(1)).findById(orderId);
+        verify(orderMapper, times(1)).toResponse(order);
+    }
+
+    @Test
+    @DisplayName("Should throw exception when order not found by id")
+    void shouldThrowExceptionWhenOrderNotFoundById() {
+        // Given
+        OrderId orderId = OrderId.generate();
+        when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
+
+        // When/Then
+        assertThatThrownBy(() -> orderService.getOrder(orderId))
+                .isInstanceOf(OrderNotFoundException.class)
+                .hasMessageContaining("Order not found with id");
+
+        verify(orderRepository, times(1)).findById(orderId);
+        verify(orderMapper, never()).toResponse(any());
     }
 }

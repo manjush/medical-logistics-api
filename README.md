@@ -304,12 +304,12 @@ GET /actuator/health
 ## Future Enhancements
 
 With more time, the following would be added:
-- [ ] PostgreSQL persistence layer
-- [ ] Redis caching for performance
-- [ ] Authentication/Authorization with Spring Security
-- [ ] OpenAPI/Swagger documentation
-- [ ] Performance metrics dashboard
-- [ ] Async processing with Spring WebFlux
+- [ ] Persistent data storage (relational or NoSQL)
+- [ ] Distributed caching for performance
+- [ ] Security layer with JWT authentication
+- [ ] API documentation with OpenAPI
+- [ ] Real-time monitoring and alerting
+- [ ] Asynchronous message processing
 
 
 

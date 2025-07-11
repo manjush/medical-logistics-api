@@ -2,8 +2,9 @@ package com.medical.logistics.interfaces.rest;
 
 
 import com.medical.logistics.application.order.OrderApplicationService;
-import com.medical.logistics.application.order.commands.*;
-import com.medical.logistics.domian.order.Order;
+import com.medical.logistics.application.order.commands.ApproveOrderCommand;
+import com.medical.logistics.application.order.commands.CancelOrderCommand;
+import com.medical.logistics.application.order.commands.PlaceOrderCommand;
 import com.medical.logistics.domian.order.OrderId;
 import com.medical.logistics.interfaces.rest.dto.CreateOrderRequest;
 import com.medical.logistics.interfaces.rest.dto.OrderResponse;
@@ -24,12 +25,11 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/orders")
 public class OrderController {
+
     private final OrderApplicationService orderService;
-    private final OrderMapper orderMapper;
 
     public OrderController(OrderApplicationService orderService) {
         this.orderService = orderService;
-        this.orderMapper = new OrderMapper();
     }
 
     @PostMapping
@@ -42,40 +42,36 @@ public class OrderController {
                         .collect(Collectors.toList())
         );
 
-        OrderId orderId = orderService.handle(command);
-        Order order = orderService.getOrder(orderId);
+        OrderResponse orderResponse = orderService.placeOrder(command);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(orderMapper.toResponse(order));
+                .body(orderResponse);
     }
 
     @PutMapping("/{orderId}/approve")
     public ResponseEntity<OrderResponse> approveOrder(@PathVariable UUID orderId) {
-        orderService.handle(new ApproveOrderCommand(OrderId.of(orderId)));
-        Order order = orderService.getOrder(OrderId.of(orderId));
-        return ResponseEntity.ok(orderMapper.toResponse(order));
+        orderService.approveOrder(new ApproveOrderCommand(OrderId.of(orderId)));
+        OrderResponse orderResponse = orderService.getOrder(OrderId.of(orderId));
+        return ResponseEntity.ok(orderResponse);
     }
 
     @PutMapping("/{orderId}/cancel")
     public ResponseEntity<OrderResponse> cancelOrder(@PathVariable UUID orderId) {
-        orderService.handle(new CancelOrderCommand(OrderId.of(orderId)));
-        Order order = orderService.getOrder(OrderId.of(orderId));
-        return ResponseEntity.ok(orderMapper.toResponse(order));
+        orderService.cancelOrder(new CancelOrderCommand(OrderId.of(orderId)));
+        OrderResponse orderResponse = orderService.getOrder(OrderId.of(orderId));
+        return ResponseEntity.ok(orderResponse);
     }
 
     @GetMapping
     public ResponseEntity<List<OrderResponse>> getAllOrders() {
-        List<Order> orders = orderService.getAllOrders();
-        List<OrderResponse> responses = orders.stream()
-                .map(orderMapper::toResponse)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(responses);
+        List<OrderResponse> orderResponses = orderService.getAllOrders();
+        return ResponseEntity.ok(orderResponses);
     }
 
     @GetMapping("/{orderId}")
     public ResponseEntity<OrderResponse> getOrder(@PathVariable UUID orderId) {
-        Order order = orderService.getOrder(OrderId.of(orderId));
-        return ResponseEntity.ok(orderMapper.toResponse(order));
+        OrderResponse orderResponse = orderService.getOrder(OrderId.of(orderId));
+        return ResponseEntity.ok(orderResponse);
     }
 }

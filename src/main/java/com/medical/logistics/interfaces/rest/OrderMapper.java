@@ -3,12 +3,14 @@ package com.medical.logistics.interfaces.rest;
 import com.medical.logistics.domian.order.Order;
 import com.medical.logistics.interfaces.rest.dto.OrderItemDto;
 import com.medical.logistics.interfaces.rest.dto.OrderResponse;
+import org.springframework.stereotype.Component;
 
 import java.util.stream.Collectors;
 
 /**
  * Mapper between domain objects and DTOs
  */
+@Component
 public class OrderMapper {
 
     public OrderResponse toResponse(Order order) {
