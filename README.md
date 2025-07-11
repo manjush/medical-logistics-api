@@ -245,7 +245,6 @@ mvn clean test
 - **Domain Tests**: Business logic validation
 - **Application Tests**: Use case testing with mocks
 - **Integration Tests**: Full API endpoint testing
-- **Repository Tests**: Data persistence verification
 
 ### TDD Approach
 
